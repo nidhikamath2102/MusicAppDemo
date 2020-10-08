@@ -1,14 +1,17 @@
 package com.nidhikamath.musicplayerdemo.adapter;
 
 import android.content.Context;
+import android.media.MediaMetadataRetriever;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.nidhikamath.musicplayerdemo.MainActivity;
 import com.nidhikamath.musicplayerdemo.R;
 import com.nidhikamath.musicplayerdemo.model.Music;
 
@@ -45,8 +48,14 @@ public class MusicAdapter extends RecyclerView.Adapter<MusicAdapter.MyViewHolder
 
     @Override
     public void onBindViewHolder(@NonNull final MyViewHolder holder, final int i) {
-        holder.name.setText(musicList.get(i).getName());
-        holder.artist.setText(musicList.get(i).getArtist());
+        Music music = musicList.get(i);
+        holder.name.setText(music.getName());
+        holder.artist.setText(music.getArtist());
+        if(!music.isPlaying()){
+            holder.play.setBackgroundResource(R.drawable.play);
+        }else{
+            holder.play.setBackgroundResource(R.drawable.pause);
+        }
         holder.play.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -55,6 +64,11 @@ public class MusicAdapter extends RecyclerView.Adapter<MusicAdapter.MyViewHolder
                 }
             }
         });
+
+        /*byte[] img = getImage(musicList.get(i).getUrl());
+        if(img!=null){
+            Glide.with(context).asBitmap().load(img).into(holder.image);
+        }*/
     }
 
     @Override
@@ -66,12 +80,22 @@ public class MusicAdapter extends RecyclerView.Adapter<MusicAdapter.MyViewHolder
 
         private TextView name, artist;
         private ImageButton play;
+        private ImageView image;
 
         public MyViewHolder(@NonNull View itemView) {
             super(itemView);
             name = itemView.findViewById(R.id.name);
             artist = itemView.findViewById(R.id.artist);
             play = itemView.findViewById(R.id.play);
+            image = itemView.findViewById(R.id.image);
         }
+    }
+
+    private byte[] getImage(String uri){
+        MediaMetadataRetriever ret = new MediaMetadataRetriever();
+        ret.setDataSource(uri);
+        byte[] art = ret.getEmbeddedPicture();
+        ret.release();
+        return art;
     }
 }

@@ -1,12 +1,5 @@
 package com.nidhikamath.musicplayerdemo;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -16,22 +9,25 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.MediaStore;
-import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.ImageView;
-import android.widget.SeekBar;
 import android.widget.Toast;
 
 import com.nidhikamath.musicplayerdemo.adapter.MusicAdapter;
 import com.nidhikamath.musicplayerdemo.model.Music;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 public class MainActivity extends AppCompatActivity {
 
-    private SeekBar seekBar;
     private RecyclerView recyclerView;
     private MusicAdapter musicAdapter;
     private RecyclerView.LayoutManager layoutManager;
@@ -39,13 +35,13 @@ public class MainActivity extends AppCompatActivity {
     private MediaPlayer mediaPlayer;
     private int REQUEST_CODE = 21;
     private Handler handler = new Handler();
+    private int pos = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        seekBar = findViewById(R.id.seekBar);
         recyclerView = findViewById(R.id.recyclerView);
 
         layoutManager = new LinearLayoutManager(this);
@@ -55,18 +51,16 @@ public class MainActivity extends AppCompatActivity {
 
         checkPermission();
         setMusicOnClick();
-        Thread t = new MyThread();
-        t.start();
-
     }
 
     private void addMusic() {
         Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         String selectQuery = MediaStore.Audio.Media.IS_MUSIC + "!=0";
         Cursor c = getContentResolver().query(uri, null, selectQuery, null, null);
-        if(c!=null){
-            if(c.moveToFirst()){
+        if (c != null) {
+            if (c.moveToFirst()) {
                 do {
+                    int id = c.getColumnIndex(android.provider.MediaStore.Audio.Media._ID);
                     String name = c.getString(c.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME));
                     String artist = "";
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -74,10 +68,11 @@ public class MainActivity extends AppCompatActivity {
                     }
                     String url = c.getString(c.getColumnIndex(MediaStore.Audio.Media.DATA));
 
-                    musicList.add(new Music(name, artist, url));
-                }while (c.moveToNext());
+                    musicList.add(new Music(id, name, artist, url));
+                } while (c.moveToNext());
             }
             c.close();
+            sortMusic();
             musicAdapter.notifyDataSetChanged();
         }
 
@@ -97,44 +92,69 @@ public class MainActivity extends AppCompatActivity {
     private void setMusicOnClick() {
         musicAdapter.setOnItemClickListener(new MusicAdapter.OnItemClickListener() {
             @Override
-            public void onItemClick(final ImageButton play, View v, final Music music, int i) {
-                if (play.getTag()!=null && play.getTag().equals(play.getResources().getString(R.string.stop))) {
-                    play.setTag(getResources().getString(R.string.play));
-                    play.setImageDrawable(getResources().getDrawable(R.drawable.play));
-                    mediaPlayer.stop();
-                    mediaPlayer.reset();
-                    mediaPlayer.release();
-                    mediaPlayer = null;
-                }else {
-                    final Runnable runnable = new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                mediaPlayer = new MediaPlayer();
-                                mediaPlayer.setDataSource(music.getUrl());
-                                mediaPlayer.prepareAsync();
-                                mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                                    @Override
-                                    public void onPrepared(MediaPlayer mediaPlayer) {
-                                        mediaPlayer.start();
+            public void onItemClick(final ImageButton play, View v, final Music music, final int i) {
 
-                                        seekBar.setProgress(0);
-                                        seekBar.setMax(mediaPlayer.getDuration());
-                                    }
-                                });
-
-                                play.setTag(getResources().getString(R.string.stop));
-                                play.setImageDrawable(getResources().getDrawable(R.drawable.pause));
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
+                try {
+                    if (pos != -1) {
+                        if(musicList.get(pos).isPlaying()) {
+                            stopMusic(play, music, pos);
+                        }else{
+                            playMusic(music, pos);
                         }
-                    };
-
-                    handler.postDelayed(runnable, 100);
+                    }
+                    if (pos != i) {
+                        if (music.isPlaying()) {
+                            stopMusic(play, music, -1);
+                        } else {
+                            playMusic(music, i);
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
         });
+    }
+
+    private void stopMusic(ImageButton play, Music music, int i) {
+        play.setTag(getResources().getString(R.string.play));
+        play.setBackgroundResource(R.drawable.play);
+        mediaPlayer.stop();
+        mediaPlayer.reset();
+        mediaPlayer.release();
+        mediaPlayer = null;
+        if (i != -1) {
+            musicList.get(i).setPlaying(false);
+        } else {
+            music.setPlaying(false);
+        }
+        musicAdapter.notifyDataSetChanged();
+    }
+
+    private void playMusic(final Music music, final int i) {
+        final Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    mediaPlayer = new MediaPlayer();
+                    mediaPlayer.setDataSource(music.getUrl());
+                    mediaPlayer.prepareAsync();
+                    mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                        @Override
+                        public void onPrepared(MediaPlayer mediaPlayer) {
+                            mediaPlayer.start();
+                        }
+                    });
+                    music.setPlaying(true);
+                    musicAdapter.notifyDataSetChanged();
+                    pos = i;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        handler.postDelayed(runnable, 100);
     }
 
     @Override
@@ -150,26 +170,12 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
-    private class MyThread extends Thread{
-        @Override
-        public void run() {
-            try{
-                Thread.sleep(1000);
-            }catch (Exception e){
-                e.printStackTrace();
+    private void sortMusic() {
+        Collections.sort(musicList, new Comparator<Music>() {
+            @Override
+            public int compare(Music music1, Music music2) {
+                return music2.getName().compareTo(music1.getName());
             }
-
-            if(mediaPlayer!=null) {
-                seekBar.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        seekBar.setProgress(mediaPlayer.getCurrentPosition());
-                        Log.d("current pos", "run: " + mediaPlayer.getCurrentPosition());
-                    }
-                });
-
-            }
-
-        }
+        });
     }
 }
