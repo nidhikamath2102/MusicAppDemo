@@ -2,16 +2,13 @@ package com.nidhikamath.musicplayerdemo.adapter;
 
 import android.content.Context;
 import android.media.MediaMetadataRetriever;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.nidhikamath.musicplayerdemo.MainActivity;
 import com.nidhikamath.musicplayerdemo.R;
 import com.nidhikamath.musicplayerdemo.model.Music;
 
